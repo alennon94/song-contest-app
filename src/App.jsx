@@ -468,6 +468,63 @@ const OverviewTab = ({ game, isGameMaster, saveGame, refreshGame }) => {
   const currentWeekData = game.weeks[game.currentWeek] || { submissions: {}, votes: {} };
   const submitted = Object.keys(currentWeekData.submissions || {}).length;
   const voted = Object.keys(currentWeekData.votes || {}).length;
+  const allSubmitted = submitted === game.players.length;
+  const allVoted = voted === game.players.length;
+
+  // Check if Spotify is connected (checking both token fields in the game object)
+  const spotifyConnected = !!(game.spotify_access_token && game.spotify_refresh_token);
+
+  const handleConnectSpotify = () => {
+    // Redirect to Spotify OAuth login with game ID in state
+    window.location.href = `/api/spotify-login?gameId=${game.id}`;
+  };
+
+  const handleCreatePlaylist = async () => {
+    if (!allSubmitted) {
+      return alert('All players must submit their songs before creating a playlist.');
+    }
+
+    if (!spotifyConnected) {
+      return alert('Please connect your Spotify account first.');
+    }
+
+    const confirmCreate = window.confirm(
+      `Create a Spotify playlist for Week ${game.currentWeek}?\n\nThis will include all ${submitted} submitted songs.`
+    );
+
+    if (!confirmCreate) return;
+
+    try {
+      const response = await fetch('/api/create-playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameId: game.id,
+          weekNumber: game.currentWeek
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.playlistUrl) {
+        // Save playlist URL to game data
+        const updatedGame = { ...game };
+        if (!updatedGame.weeks[game.currentWeek].playlistUrl) {
+          updatedGame.weeks[game.currentWeek].playlistUrl = data.playlistUrl;
+          await saveGame(updatedGame);
+        }
+
+        alert('Playlist created successfully! Opening Spotify...');
+        window.open(data.playlistUrl, '_blank');
+        await refreshGame();
+      } else {
+        alert(`Failed to create playlist: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Playlist creation error:', error);
+      alert('Error creating playlist. Check console for details.');
+    }
+  };
 
   const handleNextWeek = async () => {
     if (voted < game.players.length) {
@@ -475,35 +532,127 @@ const OverviewTab = ({ game, isGameMaster, saveGame, refreshGame }) => {
     }
     const updatedGame = { ...game, currentWeek: game.currentWeek + 1 };
     await saveGame(updatedGame);
+    await refreshGame();
   };
+
+  // Check if playlist already created for this week
+  const playlistCreated = currentWeekData.playlistUrl;
 
   return (
     <div className="space-y-8">
+      {/* Status Cards */}
       <div className="grid grid-cols-2 gap-6">
         <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
           <div className="text-xs font-bold text-purple-300 uppercase mb-2">Submissions</div>
           <div className="text-4xl font-black text-white">{submitted} / {game.players.length}</div>
+          {allSubmitted && (
+            <div className="text-xs text-green-400 mt-2">✓ All songs submitted!</div>
+          )}
         </div>
         <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
           <div className="text-xs font-bold text-purple-300 uppercase mb-2">Votes Cast</div>
           <div className="text-4xl font-black text-white">{voted} / {game.players.length}</div>
+          {allVoted && (
+            <div className="text-xs text-green-400 mt-2">✓ All votes in!</div>
+          )}
         </div>
       </div>
 
-      <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
-        <h3 className="font-bold mb-4 flex items-center gap-2"><Users className="w-4 h-4" /> Players in Battle</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {game.players.map(p => (
-            <div key={p.email} className="flex justify-between items-center p-3 bg-black/20 rounded-xl">
-              <span className="text-sm font-medium">{p.name}</span>
-              {p.email === game.gameMaster && <Crown className="w-3 h-3 text-yellow-400" />}
+      {/* Spotify Integration Section - Only for Game Master */}
+      {isGameMaster && (
+        <div className="bg-gradient-to-r from-green-500/10 to-green-600/10 border-2 border-green-500/30 rounded-2xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Music className="w-6 h-6 text-green-400" />
+            <h3 className="font-bold text-lg text-white">Spotify Integration</h3>
+          </div>
+
+          {!spotifyConnected ? (
+            <div>
+              <p className="text-purple-200 text-sm mb-4">
+                Connect your Spotify account to automatically create playlists for each week's submissions.
+              </p>
+              <button
+                onClick={handleConnectSpotify}
+                className="w-full py-4 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
+              >
+                <Music className="w-5 h-5" />
+                Connect Spotify Account
+              </button>
             </div>
-          ))}
+          ) : (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-green-400 text-sm font-bold">Spotify Connected</span>
+              </div>
+
+              {playlistCreated ? (
+                <div className="bg-black/20 p-4 rounded-xl">
+                  <div className="text-sm text-purple-200 mb-2">Week {game.currentWeek} Playlist Created</div>
+<a 
+  href={playlistCreated}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="inline-flex items-center gap-2 text-green-400 hover:text-green-300 font-bold"
+>
+  <Music className="w-4 h-4" />
+  Open in Spotify
+</a>
+                </div>
+              ) : allSubmitted ? (
+                <button
+                  onClick={handleCreatePlaylist}
+                  className="w-full py-4 bg-yellow-400 hover:bg-yellow-500 text-purple-900 font-black rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
+                >
+                  <Plus className="w-5 h-5" />
+                  Create Week {game.currentWeek} Playlist
+                </button>
+              ) : (
+                <div className="text-sm text-purple-300 text-center py-3">
+                  Playlist will be available once all songs are submitted
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Players List */}
+      <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+        <h3 className="font-bold mb-4 flex items-center gap-2">
+          <Users className="w-4 h-4" /> Players in Battle
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          {game.players.map((p) => {
+            const hasSubmitted = currentWeekData.submissions?.[p.email];
+            const hasVoted = currentWeekData.votes?.[p.email];
+            
+            return (
+              <div key={p.email} className="flex justify-between items-center p-3 bg-black/20 rounded-xl">
+                <div>
+                  <span className="text-sm font-medium">{p.name}</span>
+                  <div className="flex gap-2 mt-1">
+                    {hasSubmitted && (
+                      <span className="text-[10px] text-green-400">✓ Song</span>
+                    )}
+                    {hasVoted && (
+                      <span className="text-[10px] text-blue-400">✓ Vote</span>
+                    )}
+                  </div>
+                </div>
+                {p.email === game.gameMaster && <Crown className="w-3 h-3 text-yellow-400" />}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {isGameMaster && game.currentWeek < game.totalWeeks && (
-        <button onClick={handleNextWeek} className="w-full py-4 bg-green-500 font-bold rounded-2xl flex items-center justify-center gap-2">
+      {/* Next Week Button */}
+      {isGameMaster && game.currentWeek < game.totalWeeks && allVoted && (
+        <button
+          onClick={handleNextWeek}
+          className="w-full py-4 bg-green-500 hover:bg-green-600 text-white font-bold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg"
+        >
           ADVANCE TO NEXT WEEK <ChevronRight className="w-5 h-5" />
         </button>
       )}
@@ -520,6 +669,20 @@ const SubmitTab = ({ game, playerEmail, saveGame, refreshGame }) => {
   
   const currentWeekData = game.weeks[game.currentWeek] || { submissions: {}, votes: {} };
   const mySubmission = currentWeekData.submissions?.[playerEmail];
+
+  // Check if song is already submitted by someone else - MOVED OUTSIDE useEffect
+  const checkForDuplicates = (spotifyId) => {
+    const submissions = currentWeekData.submissions || {};
+    
+    for (const [email, submission] of Object.entries(submissions)) {
+      if (submission.spotifyId === spotifyId && email !== playerEmail) {
+        const submitterName = game.players.find(p => p.email === email)?.name || email;
+        return { isDuplicate: true, submittedBy: submitterName };
+      }
+    }
+    
+    return { isDuplicate: false };
+  };
 
   // Debounced search function
   useEffect(() => {
@@ -545,12 +708,19 @@ const SubmitTab = ({ game, playerEmail, saveGame, refreshGame }) => {
       } finally {
         setSearching(false);
       }
-    }, 500); // Wait 500ms after user stops typing
+    }, 500);
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
   const selectSong = (track) => {
+    const duplicateCheck = checkForDuplicates(track.id);
+    
+    if (duplicateCheck.isDuplicate) {
+      alert(`Sorry! "${track.title}" has already been submitted by ${duplicateCheck.submittedBy}.\n\nPlease choose a different song.`);
+      return;
+    }
+    
     setSelectedSong(track);
     setSearchQuery('');
     setShowResults(false);
@@ -583,7 +753,6 @@ const SubmitTab = ({ game, playerEmail, saveGame, refreshGame }) => {
     await refreshGame();
   };
 
-  // If already submitted
   if (mySubmission) {
     return (
       <div className="text-center py-10 bg-green-500/10 border border-green-500/30 rounded-3xl">
@@ -626,7 +795,6 @@ const SubmitTab = ({ game, playerEmail, saveGame, refreshGame }) => {
         </p>
       </div>
 
-      {/* Search Input */}
       <div className="relative">
         <input
           type="text"
@@ -642,34 +810,52 @@ const SubmitTab = ({ game, playerEmail, saveGame, refreshGame }) => {
           </div>
         )}
 
-        {/* Search Results Dropdown */}
         {showResults && searchResults.length > 0 && (
           <div className="absolute z-10 w-full mt-2 bg-purple-900 border border-white/20 rounded-2xl shadow-2xl max-h-96 overflow-y-auto">
-            {searchResults.map((track) => (
-              <button
-                key={track.id}
-                onClick={() => selectSong(track)}
-                className="w-full p-4 hover:bg-white/10 flex items-center gap-4 text-left transition-all border-b border-white/5 last:border-b-0"
-              >
-                {track.albumArt && (
-                  <img 
-                    src={track.albumArt} 
-                    alt={track.title}
-                    className="w-12 h-12 rounded shadow-lg flex-shrink-0"
-                  />
-                )}
-                
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-white truncate">{track.title}</div>
-                  <div className="text-sm text-purple-300 truncate">{track.artist}</div>
-                  <div className="text-xs text-purple-400 truncate">{track.album}</div>
-                </div>
+            {searchResults.map((track) => {
+              const duplicateCheck = checkForDuplicates(track.id);
+              const isDuplicate = duplicateCheck.isDuplicate;
+              
+              return (
+                <button
+                  key={track.id}
+                  onClick={() => selectSong(track)}
+                  disabled={isDuplicate}
+                  className={`w-full p-4 flex items-center gap-4 text-left transition-all border-b border-white/5 last:border-b-0 ${
+                    isDuplicate 
+                      ? 'opacity-50 cursor-not-allowed bg-red-500/10' 
+                      : 'hover:bg-white/10 cursor-pointer'
+                  }`}
+                >
+                  {track.albumArt && (
+                    <img 
+                      src={track.albumArt} 
+                      alt={track.title}
+                      className="w-12 h-12 rounded shadow-lg flex-shrink-0"
+                    />
+                  )}
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-white truncate">{track.title}</div>
+                    <div className="text-sm text-purple-300 truncate">{track.artist}</div>
+                    <div className="text-xs text-purple-400 truncate">{track.album}</div>
+                    {isDuplicate && (
+                      <div className="text-xs text-red-400 mt-1">
+                        ✗ Already submitted by {duplicateCheck.submittedBy}
+                      </div>
+                    )}
+                  </div>
 
-                {track.previewUrl && (
-                  <Music className="w-4 h-4 text-green-400 flex-shrink-0" title="Preview available" />
-                )}
-              </button>
-            ))}
+                  {!isDuplicate && track.previewUrl && (
+                    <Music className="w-4 h-4 text-green-400 flex-shrink-0" title="Preview available" />
+                  )}
+                  
+                  {isDuplicate && (
+                    <X className="w-5 h-5 text-red-400 flex-shrink-0" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -680,7 +866,6 @@ const SubmitTab = ({ game, playerEmail, saveGame, refreshGame }) => {
         )}
       </div>
 
-      {/* Selected Song Preview */}
       {selectedSong && (
         <div className="bg-white/10 border-2 border-yellow-400 rounded-2xl p-6">
           <div className="text-sm font-bold text-yellow-400 uppercase tracking-widest mb-4">Selected Song</div>
@@ -707,7 +892,7 @@ const SubmitTab = ({ game, playerEmail, saveGame, refreshGame }) => {
               className="w-full mt-4"
               src={selectedSong.previewUrl}
             >
-              Your browser doesn't support audio playback.
+              Your browser does not support audio playback.
             </audio>
           )}
 
@@ -729,7 +914,6 @@ const SubmitTab = ({ game, playerEmail, saveGame, refreshGame }) => {
         </div>
       )}
 
-      {/* Helper Text */}
       {!selectedSong && (
         <div className="text-center text-sm text-purple-400 mt-8">
           <Music className="w-6 h-6 mx-auto mb-2 opacity-50" />
