@@ -234,9 +234,22 @@ const HomeView = ({ games, setView, setCurrentGame, playerEmail, setPlayerEmail 
 const CreateGameView = ({ setView, saveGame, setCurrentGame, playerEmail }) => {
   const [gameName, setGameName] = useState('');
   const [totalWeeks, setTotalWeeks] = useState(4);
-  const [themes, setThemes] = useState(['', '', '', '']);
+  const [themes, setThemes] = useState(Array(4).fill(''));
   const [gameMasterName, setGameMasterName] = useState('');
   const [players, setPlayers] = useState([]);
+
+  // Adjust themes array when week count changes
+  const handleWeekChange = (newCount) => {
+    const count = parseInt(newCount);
+    setTotalWeeks(count);
+    const newThemes = [...themes];
+    if (count > themes.length) {
+      const extra = Array(count - themes.length).fill('');
+      setThemes([...newThemes, ...extra]);
+    } else {
+      setThemes(newThemes.slice(0, count));
+    }
+  };
 
   const updateTheme = (index, value) => {
     const newThemes = [...themes];
@@ -252,10 +265,15 @@ const CreateGameView = ({ setView, saveGame, setCurrentGame, playerEmail }) => {
   };
 
   const handleCreate = async () => {
-    if (!gameName.trim() || !gameMasterName.trim()) {
-      alert('Please fill in game name and your name.');
+    if (!gameName.trim()) {
+      alert('Please enter a Game Name.');
       return;
     }
+    if (!gameMasterName.trim()) {
+      alert('Please enter your name as the GameMaster.');
+      return;
+    }
+    
     const validPlayers = players.filter(p => p.name.trim() && p.email.trim());
     const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
     
@@ -270,7 +288,7 @@ const CreateGameView = ({ setView, saveGame, setCurrentGame, playerEmail }) => {
       gameMaster: playerEmail,
       totalWeeks,
       currentWeek: 1,
-      themes: themes.slice(0, totalWeeks),
+      themes: themes,
       players: allPlayers,
       weeks: {},
       cumulativeScores: {}
@@ -292,67 +310,101 @@ const CreateGameView = ({ setView, saveGame, setCurrentGame, playerEmail }) => {
       </button>
 
       <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl">
-        <h1 className="text-3xl font-black mb-8">CREATE NEW CONTEST</h1>
+        <h1 className="text-3xl font-black mb-8 text-yellow-400">CREATE NEW CONTEST</h1>
         
         <div className="space-y-6">
+          {/* GAME NAME */}
           <section>
-            <label className="block text-xs font-bold text-purple-300 uppercase mb-2">Game Name</label>
+            <label className="block text-xs font-bold text-purple-300 uppercase mb-2 tracking-widest">Game Name</label>
             <input
               type="text"
               value={gameName}
               onChange={(e) => setGameName(e.target.value)}
-              placeholder="e.g. 2024 Office Bangers"
-              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 focus:border-yellow-400 focus:outline-none"
+              placeholder="e.g. 2025 Office Bangers"
+              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 focus:border-yellow-400 focus:outline-none text-white"
             />
           </section>
 
+          {/* GAMEMASTER NAME */}
           <section>
-            <label className="block text-xs font-bold text-purple-300 uppercase mb-2">Themes per Week</label>
-            <div className="grid grid-cols-1 gap-2">
+            <label className="block text-xs font-bold text-purple-300 uppercase mb-2 tracking-widest">Your Display Name (GameMaster)</label>
+            <input
+              type="text"
+              value={gameMasterName}
+              onChange={(e) => setGameMasterName(e.target.value)}
+              placeholder="e.g. DJ Alex"
+              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 focus:border-yellow-400 focus:outline-none text-white shadow-inner"
+            />
+          </section>
+
+          {/* WEEK SELECTOR */}
+          <section>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-xs font-bold text-purple-300 uppercase tracking-widest">Duration (Weeks)</label>
+              <span className="text-yellow-400 font-bold">{totalWeeks} Weeks</span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="12"
+              value={totalWeeks}
+              onChange={(e) => handleWeekChange(e.target.value)}
+              className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-yellow-400"
+            />
+          </section>
+
+          {/* THEMES LIST */}
+          <section>
+            <label className="block text-xs font-bold text-purple-300 uppercase mb-2 tracking-widest">Weekly Themes</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {themes.map((theme, i) => (
-                <input
-                  key={i}
-                  value={theme}
-                  onChange={(e) => updateTheme(i, e.target.value)}
-                  placeholder={`Week ${i+1} Theme`}
-                  className="px-4 py-3 rounded-xl bg-white/10 border border-white/20 focus:border-yellow-400 focus:outline-none"
-                />
+                <div key={i} className="relative">
+                  <span className="absolute left-3 top-3 text-[10px] font-bold text-purple-400">W{i+1}</span>
+                  <input
+                    value={theme}
+                    onChange={(e) => updateTheme(i, e.target.value)}
+                    placeholder="Enter Theme..."
+                    className="w-full pl-8 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-yellow-400 focus:outline-none text-sm text-white"
+                  />
+                </div>
               ))}
             </div>
           </section>
 
+          {/* PLAYERS LIST */}
           <section>
-            <label className="block text-xs font-bold text-purple-300 uppercase mb-2">Players</label>
+            <label className="block text-xs font-bold text-purple-300 uppercase mb-2 tracking-widest">Invite Players</label>
             <div className="space-y-2">
-              <div className="flex gap-2 p-3 bg-yellow-400/10 rounded-xl border border-yellow-400/20">
-                <div className="flex-1 text-sm font-bold">{gameMasterName || 'You'} (GM)</div>
-                <div className="text-sm opacity-60">{playerEmail}</div>
-              </div>
               {players.map((p, i) => (
-                <div key={i} className="flex gap-2">
+                <div key={i} className="flex gap-2 group animate-in slide-in-from-left-2">
                   <input
-                    placeholder="Name"
+                    placeholder="Player Name"
                     value={p.name}
                     onChange={(e) => updatePlayer(i, 'name', e.target.value)}
-                    className="flex-1 px-4 py-2 rounded-xl bg-white/10 border border-white/20"
+                    className="flex-1 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
                   />
                   <input
-                    placeholder="Email"
+                    placeholder="Player Email"
                     value={p.email}
                     onChange={(e) => updatePlayer(i, 'email', e.target.value)}
-                    className="flex-1 px-4 py-2 rounded-xl bg-white/10 border border-white/20"
+                    className="flex-1 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
                   />
                 </div>
               ))}
-              <button onClick={addPlayer} className="text-yellow-400 text-sm font-bold">+ Add Player</button>
+              <button 
+                onClick={addPlayer} 
+                className="w-full py-2 border-2 border-dashed border-white/10 rounded-xl text-purple-300 text-xs font-bold hover:border-yellow-400/50 hover:text-yellow-400 transition-all"
+              >
+                + ADD ANOTHER PLAYER
+              </button>
             </div>
           </section>
 
           <button
             onClick={handleCreate}
-            className="w-full bg-yellow-400 text-purple-900 font-black py-4 rounded-2xl shadow-xl mt-8"
+            className="w-full bg-yellow-400 hover:bg-yellow-500 text-purple-900 font-black py-5 rounded-2xl shadow-[0_0_20px_rgba(250,204,21,0.3)] mt-8 transition-all active:scale-95"
           >
-            START CONTEST
+            LAUNCH CONTEST
           </button>
         </div>
       </div>
