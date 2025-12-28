@@ -512,24 +512,78 @@ const OverviewTab = ({ game, isGameMaster, saveGame, refreshGame }) => {
 };
 
 const SubmitTab = ({ game, playerEmail, saveGame, refreshGame }) => {
-  const [song, setSong] = useState({ title: '', artist: '', link: '' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedSong, setSelectedSong] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  
   const currentWeekData = game.weeks[game.currentWeek] || { submissions: {}, votes: {} };
   const mySubmission = currentWeekData.submissions?.[playerEmail];
 
+  // Debounced search function
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    setSearching(true);
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/spotify-search?query=${encodeURIComponent(searchQuery)}`);
+        const data = await response.json();
+        
+        if (data.tracks) {
+          setSearchResults(data.tracks);
+          setShowResults(true);
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+        alert('Failed to search Spotify. Please try again.');
+      } finally {
+        setSearching(false);
+      }
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  const selectSong = (track) => {
+    setSelectedSong(track);
+    setSearchQuery('');
+    setShowResults(false);
+    setSearchResults([]);
+  };
+
   const handleSubmit = async () => {
-    if (!song.title || !song.artist) return alert("Title and Artist are required.");
+    if (!selectedSong) {
+      return alert("Please select a song from Spotify.");
+    }
     
     const updatedGame = { ...game };
-    if (!updatedGame.weeks[game.currentWeek]) updatedGame.weeks[game.currentWeek] = { submissions: {}, votes: {} };
+    if (!updatedGame.weeks[game.currentWeek]) {
+      updatedGame.weeks[game.currentWeek] = { submissions: {}, votes: {} };
+    }
     
     updatedGame.weeks[game.currentWeek].submissions[playerEmail] = {
-      ...song,
+      title: selectedSong.title,
+      artist: selectedSong.artist,
+      spotifyUri: selectedSong.uri,
+      spotifyId: selectedSong.id,
+      albumArt: selectedSong.albumArt,
+      albumArtLarge: selectedSong.albumArtLarge,
+      previewUrl: selectedSong.previewUrl,
+      spotifyUrl: selectedSong.spotifyUrl,
       timestamp: new Date().toISOString()
     };
 
     await saveGame(updatedGame);
+    await refreshGame();
   };
 
+  // If already submitted
   if (mySubmission) {
     return (
       <div className="text-center py-10 bg-green-500/10 border border-green-500/30 rounded-3xl">
@@ -537,31 +591,151 @@ const SubmitTab = ({ game, playerEmail, saveGame, refreshGame }) => {
           <Send className="text-white w-6 h-6" />
         </div>
         <h2 className="text-2xl font-bold mb-2">Song Submitted!</h2>
-        <p className="text-purple-200">{mySubmission.title} by {mySubmission.artist}</p>
+        
+        {mySubmission.albumArt && (
+          <img 
+            src={mySubmission.albumArt} 
+            alt="Album cover"
+            className="w-32 h-32 mx-auto rounded-lg shadow-lg mb-4 mt-6"
+          />
+        )}
+        
+        <div className="text-xl font-bold">{mySubmission.title}</div>
+        <p className="text-purple-200">{mySubmission.artist}</p>
+        
+        {mySubmission.spotifyUrl && (
+          <a 
+            href={mySubmission.spotifyUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-block mt-4 px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-bold text-sm transition-all"
+          >
+            Open in Spotify
+          </a>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 max-w-md mx-auto">
-      <input
-        placeholder="Song Title"
-        className="w-full px-4 py-4 rounded-2xl bg-white/10 border border-white/20"
-        onChange={e => setSong({...song, title: e.target.value})}
-      />
-      <input
-        placeholder="Artist"
-        className="w-full px-4 py-4 rounded-2xl bg-white/10 border border-white/20"
-        onChange={e => setSong({...song, artist: e.target.value})}
-      />
-      <input
-        placeholder="Spotify URL (Optional)"
-        className="w-full px-4 py-4 rounded-2xl bg-white/10 border border-white/20"
-        onChange={e => setSong({...song, link: e.target.value})}
-      />
-      <button onClick={handleSubmit} className="w-full py-4 bg-yellow-400 text-purple-900 font-black rounded-2xl">
-        SUBMIT TO CLOUD
-      </button>
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold mb-2">Submit Your Song</h2>
+        <p className="text-purple-300 text-sm">
+          Theme: <span className="font-bold text-yellow-400">{game.themes[game.currentWeek - 1]}</span>
+        </p>
+      </div>
+
+      {/* Search Input */}
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search Spotify for a song..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full px-4 py-4 rounded-2xl bg-white/10 border border-white/20 focus:border-yellow-400 focus:outline-none text-white placeholder-purple-300"
+        />
+        
+        {searching && (
+          <div className="absolute right-4 top-4">
+            <RefreshCw className="w-5 h-5 animate-spin text-purple-400" />
+          </div>
+        )}
+
+        {/* Search Results Dropdown */}
+        {showResults && searchResults.length > 0 && (
+          <div className="absolute z-10 w-full mt-2 bg-purple-900 border border-white/20 rounded-2xl shadow-2xl max-h-96 overflow-y-auto">
+            {searchResults.map((track) => (
+              <button
+                key={track.id}
+                onClick={() => selectSong(track)}
+                className="w-full p-4 hover:bg-white/10 flex items-center gap-4 text-left transition-all border-b border-white/5 last:border-b-0"
+              >
+                {track.albumArt && (
+                  <img 
+                    src={track.albumArt} 
+                    alt={track.title}
+                    className="w-12 h-12 rounded shadow-lg flex-shrink-0"
+                  />
+                )}
+                
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-white truncate">{track.title}</div>
+                  <div className="text-sm text-purple-300 truncate">{track.artist}</div>
+                  <div className="text-xs text-purple-400 truncate">{track.album}</div>
+                </div>
+
+                {track.previewUrl && (
+                  <Music className="w-4 h-4 text-green-400 flex-shrink-0" title="Preview available" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {showResults && searchResults.length === 0 && !searching && (
+          <div className="absolute z-10 w-full mt-2 bg-purple-900 border border-white/20 rounded-2xl p-6 text-center text-purple-300">
+            No songs found. Try a different search.
+          </div>
+        )}
+      </div>
+
+      {/* Selected Song Preview */}
+      {selectedSong && (
+        <div className="bg-white/10 border-2 border-yellow-400 rounded-2xl p-6">
+          <div className="text-sm font-bold text-yellow-400 uppercase tracking-widest mb-4">Selected Song</div>
+          
+          <div className="flex items-center gap-4">
+            {selectedSong.albumArtLarge && (
+              <img 
+                src={selectedSong.albumArtLarge} 
+                alt={selectedSong.title}
+                className="w-24 h-24 rounded-lg shadow-xl flex-shrink-0"
+              />
+            )}
+            
+            <div className="flex-1">
+              <div className="text-xl font-bold text-white mb-1">{selectedSong.title}</div>
+              <div className="text-purple-200 mb-2">{selectedSong.artist}</div>
+              <div className="text-sm text-purple-300">{selectedSong.album}</div>
+            </div>
+          </div>
+
+          {selectedSong.previewUrl && (
+            <audio 
+              controls 
+              className="w-full mt-4"
+              src={selectedSong.previewUrl}
+            >
+              Your browser doesn't support audio playback.
+            </audio>
+          )}
+
+          <div className="flex gap-3 mt-4">
+            <button
+              onClick={() => setSelectedSong(null)}
+              className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold transition-all"
+            >
+              Change Song
+            </button>
+            
+            <button
+              onClick={handleSubmit}
+              className="flex-1 py-3 bg-yellow-400 hover:bg-yellow-500 text-purple-900 rounded-xl font-black transition-all shadow-lg"
+            >
+              Confirm & Submit
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Helper Text */}
+      {!selectedSong && (
+        <div className="text-center text-sm text-purple-400 mt-8">
+          <Music className="w-6 h-6 mx-auto mb-2 opacity-50" />
+          Start typing to search millions of songs on Spotify
+        </div>
+      )}
     </div>
   );
 };
