@@ -479,6 +479,7 @@ const OverviewTab = ({ game, isGameMaster, saveGame, refreshGame }) => {
   window.location.href = `/api/spotify-login?gameId=${game.id}`;
 };
 
+
   const handleCreatePlaylist = async () => {
     if (!allSubmitted) {
       return alert('All players must submit their songs before creating a playlist.');
