@@ -21,9 +21,17 @@ export default async function handler(req, res) {
   try {
     const clientId = process.env.SPOTIFY_CLIENT_ID;
     const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-    const redirectUri = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}/api/spotify-callback`
-      : 'http://localhost:3000/api/spotify-callback';
+    
+    // Use the same redirect URI logic as spotify-login.js
+    let redirectUri;
+    
+    if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
+      redirectUri = 'https://song-contest-app.vercel.app/api/spotify-callback';
+    } else {
+      redirectUri = 'http://localhost:3000/api/spotify-callback';
+    }
+
+    console.log('Exchanging code with redirect URI:', redirectUri); // Debug log
 
     // Exchange code for tokens
     const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
@@ -40,6 +48,8 @@ export default async function handler(req, res) {
     });
 
     if (!tokenResponse.ok) {
+      const errorData = await tokenResponse.json();
+      console.error('Token exchange failed:', errorData);
       throw new Error('Failed to exchange code for tokens');
     }
 
@@ -91,9 +101,12 @@ export default async function handler(req, res) {
     }
 
     // Redirect back to app
-    const redirectUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}/?spotify=connected&game=${gameId}`
-      : `http://localhost:3000/?spotify=connected&game=${gameId}`;
+    let redirectUrl;
+    if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
+      redirectUrl = `https://song-contest-app.vercel.app/?spotify=connected&game=${gameId}`;
+    } else {
+      redirectUrl = `http://localhost:3000/?spotify=connected&game=${gameId}`;
+    }
 
     res.redirect(redirectUrl);
 
