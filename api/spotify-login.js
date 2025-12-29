@@ -1,17 +1,26 @@
-export default async function handler(req, res) {
-  const { gameId, redirectUri } = req.query;
+// /api/spotify-login.js
+export default function handler(req, res) {
+  const { gameId } = req.query;
 
-  const scope = 'playlist-modify-public playlist-modify-private';
+  if (!gameId) {
+    return res.status(400).json({ error: 'Game ID is required' });
+  }
+
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const redirectUri = process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}/api/spotify-callback`
+    : 'http://localhost:3000/api/spotify-callback';
+
+  const scopes = 'playlist-modify-public playlist-modify-private';
   
-  // Construct the Spotify Auth URL
-  const params = new URLSearchParams({
+  const authUrl = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({
     response_type: 'code',
-    client_id: process.env.SPOTIFY_CLIENT_ID,
-    scope: scope,
-    // Use the redirectUri passed from the frontend
-    redirect_uri: redirectUri, 
-    state: gameId // We use state to pass the gameId through the login flow
+    client_id: clientId,
+    scope: scopes,
+    redirect_uri: redirectUri,
+    state: gameId,
+    show_dialog: 'true'
   });
 
-  res.redirect(`https://accounts.spotify.com/authorize?${params.toString()}`);
+  res.redirect(authUrl);
 }

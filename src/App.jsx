@@ -475,12 +475,8 @@ const OverviewTab = ({ game, isGameMaster, saveGame, refreshGame }) => {
   const spotifyConnected = !!(game.spotify_access_token && game.spotify_refresh_token);
 
   const handleConnectSpotify = () => {
-  const origin = window.location.origin;
-  // This must match the filename in your /api folder
-  const redirectUri = `${origin}/api/spotify-callback`; 
-  
-  // Direct the user to your login handler
-  window.location.href = `/api/spotify-login?gameId=${currentGame.id}&redirectUri=${encodeURIComponent(redirectUri)}`;
+  // Redirect to Spotify OAuth login with game ID in state
+  window.location.href = `/api/spotify-login?gameId=${game.id}`;
 };
 
   const handleCreatePlaylist = async () => {
