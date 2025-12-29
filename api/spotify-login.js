@@ -7,9 +7,17 @@ export default function handler(req, res) {
   }
 
   const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const redirectUri = process.env.VERCEL_URL 
-    ? `https://${process.env.VERCEL_URL}/api/spotify-callback`
-    : 'http://localhost:3000/api/spotify-callback';
+  
+  // Determine redirect URI based on environment
+  let redirectUri;
+  
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
+    // Production - use your actual domain
+    redirectUri = 'https://song-contest-app.vercel.app/api/spotify-callback';
+  } else {
+    // Local development
+    redirectUri = 'http://localhost:3000/api/spotify-callback';
+  }
 
   const scopes = 'playlist-modify-public playlist-modify-private';
   
@@ -21,6 +29,8 @@ export default function handler(req, res) {
     state: gameId,
     show_dialog: 'true'
   });
+
+  console.log('Redirecting to Spotify with URI:', redirectUri); // Debug log
 
   res.redirect(authUrl);
 }
