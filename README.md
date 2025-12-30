@@ -1,3 +1,12 @@
+# notes on services used to set this up:
+Drafted code in Virtual Studio
+Code hosted on GitHub - https://github.com/alennon94/song-contest-app
+Database in Supabase
+Webpage hosted on Vercel. Secure Spotify key info on Supabase too.
+Previous version I tried to use Resend for email automation, and ngrok for API forwarding for local spotify integration testing. These are not currently used.
+
+
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
