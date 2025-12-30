@@ -18,7 +18,7 @@ const SongContestApp = () => {
   const [view, setView] = useState('home'); // home, create, game
   const [loading, setLoading] = useState(true);
 
-  // Load games from Supabase on mount
+  // Load games from Supabase on mount 
   useEffect(() => {
     loadGames();
   }, []);
