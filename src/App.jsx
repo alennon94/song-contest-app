@@ -467,23 +467,45 @@ const ResultsTab = ({ game }) => {
         ))}
       </div>
 
-      {/* 2. Weekly Breakdowns */}
+      {/* 2. Detailed Weekly Votes Table */}
       <section>
-        <h3 className="text-sm font-black text-purple-300 uppercase mb-4 text-center">Weekly Detail</h3>
-        <div className="space-y-4">
+        <h3 className="text-sm font-black text-purple-300 uppercase mb-4 text-center">Weekly Voting Detail</h3>
+        <div className="space-y-8">
           {[...Array(resultsWeek)].map((_, i) => {
             const wNum = i + 1;
-            const weekScores = getPointsForWeek(wNum);
-            const sortedWeek = [...game.players].sort((a,b) => (weekScores[a.email] || 99) - (weekScores[b.email] || 99));
+            const weekData = game.weeks[wNum] || { votes: {} };
             return (
-              <div key={wNum} className="bg-black/20 rounded-2xl p-4 border border-white/5">
-                <div className="text-xs font-bold text-yellow-400 mb-3 tracking-widest">WEEK {wNum}: {game.themes[wNum-1]}</div>
-                {sortedWeek.map(p => (
-                  <div key={p.email} className="flex justify-between text-sm py-1 border-b border-white/5 last:border-0">
-                    <span>{p.name}</span>
-                    <span className="font-mono font-bold">{weekScores[p.email] || 0} pts</span>
-                  </div>
-                ))}
+              <div key={wNum} className="bg-black/20 rounded-2xl p-6 border border-white/5 overflow-x-auto">
+                <div className="text-xs font-bold text-yellow-400 mb-4 tracking-widest uppercase">Week {wNum}: {game.themes[wNum-1]}</div>
+                <table className="w-full text-[10px] text-left border-collapse min-w-[500px]">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="p-2 text-purple-400">Voter \ Target</th>
+                      {game.players.map(p => (
+                        <th key={p.email} className="p-2 text-purple-400 font-bold">{p.name}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {game.players.map(voter => (
+                      <tr key={voter.email} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                        <td className="p-2 font-black text-purple-300 bg-white/5">{voter.name}</td>
+                        {game.players.map(target => {
+                          const rank = weekData.votes?.[voter.email]?.[target.email];
+                          return (
+                            <td key={target.email} className="p-2 text-center">
+                              {voter.email === target.email ? (
+                                <span className="opacity-20">—</span>
+                              ) : (
+                                <span className={rank === '1' ? 'text-yellow-400 font-bold' : 'text-slate-100'}>{rank || '?'}</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             );
           })}
