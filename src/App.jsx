@@ -465,27 +465,41 @@ const ResultsTab = ({ game }) => {
         ))}
       </div>
 
-      {/* 2. Swapped Weekly Votes Table */}
+      {/* 2. Swapped, Sorted Weekly Votes Table with Weekly Totals */}
       <section>
         <h3 className="text-sm font-black text-purple-300 uppercase mb-4 text-center">Weekly Voting Detail</h3>
         <div className="space-y-8">
           {[...Array(resultsWeek)].map((_, i) => {
             const wNum = i + 1;
             const weekData = game.weeks[wNum] || { votes: {}, submissions: {} };
+            
+            // Calculate total score for each song this week
+            const targetScores = game.players.map(p => {
+              let score = 0;
+              Object.values(weekData.votes || {}).forEach(ballot => {
+                if (ballot[p.email]) score += parseInt(ballot[p.email]);
+              });
+              return { ...p, weeklyScore: score };
+            });
+
+            // Sort by weekly score (ascending - lowest points wins the week)
+            const sortedTargets = [...targetScores].sort((a, b) => a.weeklyScore - b.weeklyScore);
+
             return (
               <div key={wNum} className="bg-black/20 rounded-2xl p-6 border border-white/5 overflow-x-auto">
                 <div className="text-xs font-bold text-yellow-400 mb-4 tracking-widest uppercase text-center">Week {wNum}: {game.themes[wNum-1]}</div>
-                <table className="w-full text-[10px] text-left border-collapse min-w-[600px]">
+                <table className="w-full text-[10px] text-left border-collapse min-w-[700px]">
                   <thead>
                     <tr className="border-b border-white/10">
                       <th className="p-3 text-purple-400 bg-white/5 rounded-tl-xl">Song (Submitter)</th>
                       {game.players.map(p => (
                         <th key={p.email} className="p-3 text-purple-400 font-bold text-center">Voter: {p.name}</th>
                       ))}
+                      <th className="p-3 text-yellow-400 font-black text-center bg-white/10 rounded-tr-xl">WEEK TOTAL</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {game.players.map(targetPlayer => {
+                    {sortedTargets.map((targetPlayer) => {
                       const song = weekData.submissions?.[targetPlayer.email];
                       return (
                         <tr key={targetPlayer.email} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
@@ -507,6 +521,9 @@ const ResultsTab = ({ game }) => {
                               </td>
                             );
                           })}
+                          <td className="p-3 text-center bg-white/10 font-black text-sm text-yellow-400">
+                            {targetPlayer.weeklyScore}
+                          </td>
                         </tr>
                       );
                     })}
