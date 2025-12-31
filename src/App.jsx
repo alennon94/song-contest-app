@@ -222,8 +222,6 @@ const GameView = ({ game, setView, saveGame, playerEmail, setCurrentGame, refres
   );
 };
 
-// --- IMPROVED TABS ---
-
 const OverviewTab = ({ game, isGameMaster, saveGame }) => {
   const currentWeekData = game.weeks[game.currentWeek] || { submissions: {}, votes: {} };
   const [nextTheme, setNextTheme] = useState(game.themes[game.currentWeek] || '');
@@ -467,43 +465,51 @@ const ResultsTab = ({ game }) => {
         ))}
       </div>
 
-      {/* 2. Detailed Weekly Votes Table */}
+      {/* 2. Swapped Weekly Votes Table */}
       <section>
         <h3 className="text-sm font-black text-purple-300 uppercase mb-4 text-center">Weekly Voting Detail</h3>
         <div className="space-y-8">
           {[...Array(resultsWeek)].map((_, i) => {
             const wNum = i + 1;
-            const weekData = game.weeks[wNum] || { votes: {} };
+            const weekData = game.weeks[wNum] || { votes: {}, submissions: {} };
             return (
               <div key={wNum} className="bg-black/20 rounded-2xl p-6 border border-white/5 overflow-x-auto">
-                <div className="text-xs font-bold text-yellow-400 mb-4 tracking-widest uppercase">Week {wNum}: {game.themes[wNum-1]}</div>
-                <table className="w-full text-[10px] text-left border-collapse min-w-[500px]">
+                <div className="text-xs font-bold text-yellow-400 mb-4 tracking-widest uppercase text-center">Week {wNum}: {game.themes[wNum-1]}</div>
+                <table className="w-full text-[10px] text-left border-collapse min-w-[600px]">
                   <thead>
                     <tr className="border-b border-white/10">
-                      <th className="p-2 text-purple-400">Voter \ Target</th>
+                      <th className="p-3 text-purple-400 bg-white/5 rounded-tl-xl">Song (Submitter)</th>
                       {game.players.map(p => (
-                        <th key={p.email} className="p-2 text-purple-400 font-bold">{p.name}</th>
+                        <th key={p.email} className="p-3 text-purple-400 font-bold text-center">Voter: {p.name}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {game.players.map(voter => (
-                      <tr key={voter.email} className="border-b border-white/5 last:border-0 hover:bg-white/5">
-                        <td className="p-2 font-black text-purple-300 bg-white/5">{voter.name}</td>
-                        {game.players.map(target => {
-                          const rank = weekData.votes?.[voter.email]?.[target.email];
-                          return (
-                            <td key={target.email} className="p-2 text-center">
-                              {voter.email === target.email ? (
-                                <span className="opacity-20">—</span>
-                              ) : (
-                                <span className={rank === '1' ? 'text-yellow-400 font-bold' : 'text-slate-100'}>{rank || '?'}</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                    {game.players.map(targetPlayer => {
+                      const song = weekData.submissions?.[targetPlayer.email];
+                      return (
+                        <tr key={targetPlayer.email} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                          <td className="p-3 bg-white/5 border-r border-white/10">
+                            <div className="font-bold text-slate-100">{song?.title || "No Submission"}</div>
+                            <div className="text-[9px] text-purple-300 italic">by {targetPlayer.name}</div>
+                          </td>
+                          {game.players.map(voter => {
+                            const rank = weekData.votes?.[voter.email]?.[targetPlayer.email];
+                            return (
+                              <td key={voter.email} className="p-3 text-center">
+                                {voter.email === targetPlayer.email ? (
+                                  <span className="opacity-10 text-[14px]">X</span>
+                                ) : (
+                                  <span className={rank === '1' ? 'text-yellow-400 font-black text-xs' : 'text-slate-300'}>
+                                    {rank ? `${rank}${rank === '1' ? 'st' : rank === '2' ? 'nd' : rank === '3' ? 'rd' : 'th'}` : '—'}
+                                  </span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
